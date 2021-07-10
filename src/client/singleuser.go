@@ -1,10 +1,11 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
-	su "github.com/ihexxa/quickshare/src/handlers/singleuserhdr"
+	"github.com/ihexxa/quickshare/src/handlers/multiusers"
 	"github.com/parnurzeal/gorequest"
 )
 
@@ -27,7 +28,7 @@ func (cl *SingleUserClient) url(urlpath string) string {
 
 func (cl *SingleUserClient) Login(user, pwd string) (*http.Response, string, []error) {
 	return cl.r.Post(cl.url("/v1/users/login")).
-		Send(su.LoginReq{
+		Send(multiusers.LoginReq{
 			User: user,
 			Pwd:  pwd,
 		}).
@@ -42,10 +43,68 @@ func (cl *SingleUserClient) Logout(token *http.Cookie) (*http.Response, string, 
 
 func (cl *SingleUserClient) SetPwd(oldPwd, newPwd string, token *http.Cookie) (*http.Response, string, []error) {
 	return cl.r.Patch(cl.url("/v1/users/pwd")).
-		Send(su.SetPwdReq{
+		Send(multiusers.SetPwdReq{
 			OldPwd: oldPwd,
 			NewPwd: newPwd,
 		}).
 		AddCookie(token).
 		End()
+}
+
+func (cl *SingleUserClient) AddUser(name, pwd, role string, token *http.Cookie) (*http.Response, *multiusers.AddUserResp, []error) {
+	resp, body, errs := cl.r.Post(cl.url("/v1/users/")).
+		AddCookie(token).
+		Send(multiusers.AddUserReq{
+			Name: name,
+			Pwd:  pwd,
+			Role: role,
+		}).
+		End()
+
+	if len(errs) > 0 {
+		return nil, nil, errs
+	}
+
+	auResp := &multiusers.AddUserResp{}
+	err := json.Unmarshal([]byte(body), auResp)
+	if err != nil {
+		errs = append(errs, err)
+		return nil, nil, errs
+	}
+	return resp, auResp, errs
+}
+
+func (cl *SingleUserClient) AddRole(role string, token *http.Cookie) (*http.Response, string, []error) {
+	return cl.r.Post(cl.url("/v1/roles/")).
+		AddCookie(token).
+		Send(multiusers.AddRoleReq{
+			Role: role,
+		}).
+		End()
+}
+
+func (cl *SingleUserClient) DelRole(role string, token *http.Cookie) (*http.Response, string, []error) {
+	return cl.r.Delete(cl.url("/v1/roles/")).
+		AddCookie(token).
+		Send(multiusers.DelRoleReq{
+			Role: role,
+		}).
+		End()
+}
+
+func (cl *SingleUserClient) ListRoles(token *http.Cookie) (*http.Response, *multiusers.ListRolesResp, []error) {
+	resp, body, errs := cl.r.Get(cl.url("/v1/roles/")).
+		AddCookie(token).
+		End()
+	if len(errs) > 0 {
+		return nil, nil, errs
+	}
+
+	lsResp := &multiusers.ListRolesResp{}
+	err := json.Unmarshal([]byte(body), lsResp)
+	if err != nil {
+		errs = append(errs, err)
+		return nil, nil, errs
+	}
+	return resp, lsResp, errs
 }
